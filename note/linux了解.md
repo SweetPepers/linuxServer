@@ -100,7 +100,7 @@
     - 加载慢
     - 发布时需要提供依赖的动态库
 
-### makefile
+## makefile
 
 自动化编译
 make命令默认只执行第一条规则
@@ -118,7 +118,7 @@ make命令默认只执行第一条规则
 7. 伪目标 `.PHONY:clean` 之后就不会和外面对比了(工作原理2, 检查更新)
 
  
-### GDB
+## GDB
 功能
   - 启动程序
   - 让程序在指定断点处停下(断点可以为表达式)
@@ -129,3 +129,107 @@ make命令默认只执行第一条规则
 3. 命令![](../picture/gdb命令.jpg)设置参数就是cmd里面给的那个
 4. 断点![](../picture/gdb断点.jpg)
 5. 调试![](../picture/gdb调试.jpg)
+
+
+## linux文件
+
+### 标准C库IO函数和linux系统IO函数对比
+
+跨平台实现: java虚拟机, C调用系统API
+标准C库带有缓冲区, linux自带IO无缓冲区
+![](../picture/1标准C库IO.jpg)
+### 虚拟地址空间
+
+![](../picture/1虚拟地址空间.jpg)
+
+### 文件描述符
+![](../picture/1文件描述符.jpg)
+PCB里面存在一个文件描述符表
+
+
+### linux系统IO函数
+
+- open
+  int open(const char* pathname, int flags);
+  int open(const char* pathname, int flags, mode_t mode);
+  打开文件  open.c
+
+  创建文件 open.c/ceate()
+  ![](../picture/1文件create.jpg)  **这里和umask不符**
+
+- read/write
+  ssize_t read(int fd, void *buf, size_t count);
+  ssize_t write(int fd, const   void *buf, size_t count);
+- lseek
+  c语言库里为fseek
+  off_t lseek(int fd, off_t offset, int whence);
+  作用: 
+  1. 移动文件指针到头文件 lseek(fd, 0, SEEK_SET)
+  2. 获取当前文件指针的位置  a = lseek(fd, 0, SEEK_CUR)
+  3. 获取文件长度 len = lseek(fd, 0, SEEK_END)
+  4. 拓展文件长度, 比如增加100字节, (当前是10) lseek(fd,100, SEEK_END), 比如下载的时候, 先拓展占用位置, 然后慢慢下载
+  写一个`" "` 就从10 变成 110了, (见 `hello.txt`)
+- stat/lstat 
+  linux还有 `stat`这个命名: 查看文件信息
+  int stat(const char *pathname, struct stat *statbuf)
+  int lstat(const char *pathname, struct stat *statbuf)
+  ![](../picture/1stat结构题.jpg)
+  ![](../picture/1st_mode.jpg)
+
+### 文件属性操作函数
+`file_property.c`  
+int access(const char* paathname, int mode);
+  - 判断某个文件是个否有mode指定的权限
+  - mode取值: R_OK W_OK X_OK F_OK(是否存在)
+
+int chmod(const char* filename, int mode);
+  - 修改文件权限
+  - mode取值: 具体查看`man 2 chmod`
+
+int chown(const char* path, uid_t owner, gid_t group);
+int truncate(const char * path, off_t length);
+  - 缩减或扩展文件的大小
+
+
+### 目录操作函数
+`filedir.c`  
+
+int mkdir(const char* pathname, mode_t mode);
+
+int rmdir(const char* pathname);
+
+int rename(const char* oldpath, const char* newpath)
+
+int chdir(const char* path);
+  - 修改进程的工作目录  
+
+char* getcwd(char *buf, size_t size);
+  - 获取当前工作路径
+
+
+### 目录遍历函数 
+
+`man 3 opendir`  
+DIR *opendir(const char* name);
+struct dirent *readdir(DIR *dirp);
+int closedir(DIR *dirp);
+
+### dup dup2函数
+- int dup(int oldfd) : 复制一个新的文件描述符
+  从空闲的文件描述符表中找一个最小的, 作为新的拷贝的文件描述符, 两个文件描述符指向同一个文件
+- int dup2(int oldfd, int newfd)
+  用指定的newfd(必须有效)指向oldfd指向的文件, 重定向文件描述符
+
+
+### fcntl
+int fcntl(int fd, int cmd, .../*arg*/)
+  - 复制文件描述符
+  - 设置/获取文件的状态标志  
+     #include <unistd.h>  
+     #include <fcntl.h>
+
+       int fcntl(int fd, int cmd, ... /* arg */ );
+    - 参数 cmd
+      - F_DUPFD : 复制文件描述符 int ret = fcntl(fd, D_DUPFD)
+      - F_GETFL : 获取文件状态flag
+      - F_SETFL : 设置

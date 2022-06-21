@@ -1,0 +1,11 @@
+{
+  "makefile.extensionOutputFolder": "./.vscode",
+  "files.associations": {
+    "*.vue": "vue",
+    "*.wpy": "vue",
+    "*.wxml": "html",
+    "*.wxss": "css",
+    "fcntl.h": "c",
+    "stat.h": "c"
+  }
+}
