@@ -1,5 +1,5 @@
 # 了解linux
-
+运行进程的时候加个 `&` 表示在后台运行
 ## gcc
 
 - `gcc test_gcc.c -E -o test.i` 预处理
@@ -233,3 +233,172 @@ int fcntl(int fd, int cmd, .../*arg*/)
       - F_DUPFD : 复制文件描述符 int ret = fcntl(fd, D_DUPFD)
       - F_GETFL : 获取文件状态flag
       - F_SETFL : 设置
+
+
+
+# linux多进程开发
+
+## 进程
+
+在传统的操作系统中, 进程既是基本的分配单元, 也是基本的执行单元
+
+内核数据结构
+  - 进程相关的标识号(IDs)
+  - 虚拟内存表
+  - 打开的文件描述符
+  - 信号传递及处理的有关信息
+  - 进程资源使用及限制
+  - 当前工作目录等 
+
+![](../picture/2单道多道程序.jpg)
+
+![](../picture/2PCB.jpg)
+![](../picture/2PCb2.jpg)
+- 进程可以使用的资源上限(可用`ulimit -a`查看)
+
+
+### 进程状态切换
+新建态,就绪态,运行态,阻塞态(wait/sleep),终止态
+![](../picture/2进程状态转换.jpg)
+
+- 显示进程信息 指令`ps`
+  `ps aux`![](../picture/2指令ps.jpg)
+  - 表头
+    - tty : 当前进程所属的终端
+    - STAT状态![](../picture/2STAT参数意义.jpg)
+    - command : 什么命令产生的进程
+  `ps ajx`![](../picture/2psajx.jpg)
+    - PPID: parent process ID
+    - PGID: process group ID
+    - SID : 会话ID(例: 多个group组成一个会话)
+
+- 动态显示进程 `top`![](../picture/2动态显示进程.jpg)
+- `kill` 杀死进程
+  - `kill [-signal] pid`
+  - `kill -l`列出所有信号
+  - `kill -SIGKILL pid`强制干掉
+  - `kill -9 pid`强制干掉
+
+### fork
+改的 : 
+- pid,ppid 
+- 返回值rax
+- 信号集
+
+fork()通过 **写时拷贝(copy-on-write)** 实现.写时拷贝可以推迟甚至避免拷贝数据的技术.
+内核此时并不复制整个进程的地址空间,而是让父子进程共享同一个地址空间.即资源的复制只有在需要写入的时候才会进行,在此之前都是以只读方式共享
+
+fork产生的子进程与父进程相同文件的文件描述符指向相同的文件表, 引用计数增加
+
+### GDB多进程调试
+`hello.c`
+
+gdb默认追踪父进程
+设置 调试父进程或者子进程`set follow-fork-mode [parent|child]`
+`set detach-on-fork [on|off]`调试的时候 另一个进程是否悬停在fork()
+
+其他几个命令 
+ - `info inferiors` 查看调试的进程
+ - `inferiors id` 切换当前调试的进程
+ - `detach inferiors id`使进程脱离GDB调试
+
+### exec函数族  `elecl.c`
+exec根据文件名找到可执行文件,并用它来取代调用进程的内容,即在调用程序内部执行一个可执行文件
+ 
+**保留内核区, 但用户区直接被替换为调用函数**
+
+返回: **执行成功不会返回**, 失败返回-1 
+![](../picture/2_3exec函数族.jpg)
+
+
+执行exec 
+![](../picture/2_6execl2.jpg)
+并不会出现下面那种两次终端的情况
+
+孤儿进程会多一次终端
+![](../picture/2_6孤儿.jpg)
+最后无了,
+原因: 父进程已经结束运行, 子进程变为了孤儿进程
+另外可以看到, 调用进程的pid = 4382 等于exec中子进程的pid, 
+//但是ppid两者不一样???
+ 1924 是init的进程号, 见下面孤儿进程, TODO **教学里面父进程是1**
+
+
+### 进程退出, 孤儿进程,僵尸进程 
+- 进程退出
+  ![](../picture/2_7进程退出.jpg)
+  `_exit()`不会刷新I/O缓冲区
+  ![](../picture/2_7exitIO.jpg)
+
+- 孤儿进程
+  - 父进程结束子进程还运行
+  - 出现孤儿进程时, 内核会把孤儿进程的父进程设置为init, init会循环的wait()这些子进程, 
+  - 孤儿进程也不会有什么危害
+- 僵尸进程![](../picture/2_7僵尸进程.jpg)
+  - zombie.c
+  - 内核区没有释放
+  - 子进程结束而父进程没有结束导致自己成内核区不能释放
+
+### wait  waitpid
+`waitdemo.c`
+![](../picture/2_8进程回抽.jpg)
+
+```c
+pid_t wait(int *wstatus);
+  - 成功返回子进程id
+  - 失败返回-1(所有子进程结束 or  调用失败)
+  调用wait会阻塞
+  - wstatus  存储退出信息 
+
+  有些退出信息宏函数, 
+    - WIFEXITED(wstatus) 
+    - WEXITSTATUS(wstatus)
+
+    等等 
+```
+
+```c
+pid_t waitpid(pid_t pid, int *wstatus, int options);
+  回收指定进程号的子进程,可以设置是否阻塞
+
+  - pid :
+      >0 : 子进程
+      =0 : 回收当前进程组的所有子进程
+      -1 : 回收所有子进程(相当于wait())
+      <-1: 回收某个进程组的组id, 进程组id为 -pid, 
+  - ret :
+      >0 子进程id
+      =0 :在 option=WHNOHANG下, 表示还有子进程
+      =-1: 错误或者没子进程
+```
+
+
+## 进程间通信 (IPC)
+
+![](../picture/2_10进程间通信.jpg)
+
+- 匿名管道
+  - 半双工
+  - 只能在具有公共祖先的进程(父与子, 或者兄弟进程)之间使用
+  
+  为啥可以用管道进行进程间通信?
+    - 亲缘进程之间的文件描述符共享
+  
+  数据结构
+    - 环形队列
+
+
+### 匿名管道通信  pipe.c
+![](../picture/2_10匿名管道的使用.jpg)
+
+管道 默认**阻塞**
+
+一个例子 : 实现 ps aux | grep xxx  `parent-child-ipc.c`
+
+
+### 管道的读写特点
+
+1. 指向管道写端的文件描述符都被关闭了(管道写端引用计数为0), 当管道中的数据被读完后, 再read就会返回0,(类似文件EOF)
+2. 没有关闭(管道写端引用计数大于0), 数据被读完后再read就会阻塞
+3. 管道读端引用计数等于0(**读端都关闭**), 继续写, 该进程就会收到SIGPIPE信号, 通常导致进程异常终止
+4. 读端引用计数大于0,管道满了会阻塞 
