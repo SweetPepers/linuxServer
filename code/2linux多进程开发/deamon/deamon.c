@@ -53,6 +53,11 @@ int main(){
   dup2(STDERR_FILENO, fd);
 
 
+  // dup2(fd, STDIN_FILENO);
+  // dup2(fd, STDOUT_FILENO);
+  // dup2(fd, STDERR_FILENO);
+
+
   // 6. gongneng 
 
   // 捕捉定时信号

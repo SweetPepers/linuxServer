@@ -620,3 +620,119 @@ signal/sigfunc.c
 5. 关闭守护进程从其父进程继承而来的打开的文件描述符
 6. 关闭fd 0,1,2后,守护进程通常会打开/dev/null并使用dup2()使所有这些描述符指向这个设备
 7. 业务逻辑(进程功能)
+
+
+
+
+# linux多线程开发
+
+
+## 线程
+线程共享同一份全局内存区域, 包括初始化数据段、未初始化数据段,以及堆内存段
+
+
+线程是轻量级的进程(LWP:light weight process), 在linux下线程本质仍然是进程, 查看LWP号 `ps -Lf pid`
+
+虚拟地址空间内：栈空间和.text段切割
+
+
+- 线程操作函数 `thread/pthread.c`
+```c
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
+void pthread_exit(void *retval);
+
+int pthread_join(pthread_t thread, void **retval);
+```
+
+- pthread_join / retval每次值都不一样
+  - 函数里面的int a是一个局部变量, 返回的是局部变量的地址, 线程结束后, 栈被释放掉, 指针指向的值随机
+  - 为什么传递二级指针??
+    - 要修改 一级指针本身的值需要二级指针,即一级指针本身内容的地址, 否则就是值传递, 而非引用传递
+
+```c
+int pthread_detach(pthread_t thread);
+  - 当一个分离的线程终止时会自动将资源返还给os, 而不需要其他线程的join
+  不能多次 detach 线程
+int pthread_cancel(pthread_t thread);
+  - 取消线程(终止), 但不是立刻终止, 而是当子线程执行到一个取消点(系统规定的系统调用), 可以粗略的理解为从用户区到内核区的一个调用
+```
+
+TODO : 为什么有时候cancel输出了两次??
+child 0
+child 0
+0
+1
+2
+3
+
+
+- 线程属性 pthread_create() 里面的attr参数
+  `thead/pthread_attr.c`
+  各种操作函数 `pthread_attr_*()`
+
+
+## 锁
+线程同步  `mutex/sellticket.c`
+临界区操作
+- 互斥量 `mutex`
+  ```c
+  pthread_mutex_t
+  int pthread_mutex_init(pthread_mutex_t * restrict mutex, const pthread_lockattr_t *mutex)
+  int pthread_mutex_destory(pthread_mutex_t *mutex);
+  int pthread_mutex_lock(pthread_mutex_t *mutex);
+  int pthread_mutex_trylock(pthread_mutex_t *mutex);
+  int pthread_mutex_unlock(pthread_mutex_t *mutex);
+  - restrict C语言的修饰符, 被修饰的指针不能由另外一个指针进行操作
+  ```
+
+- 读写锁 : 写是独占的, 写的优先级最高, 多个线程同时读共享资源不会导致问题
+    ```c
+  pthread_rwmutex_t
+  int pthread_rwmutex_init(pthread_rwmutex_t * restrict rwmutex, const pthread_rwmutex_t *rwmutex)
+  int pthread_rwmutex_destory(pthread_rwmutex_t *rwmutex);
+  int pthread_rwmutex_rdlock(pthread_rwmutex_t *rwmutex);
+  int pthread_rwmutex_tryrdlock(pthread_rwmutex_t *rwmutex);
+  int pthread_rwmutex_wrlock(pthread_rwmutex_t *rwmutex);
+  int pthread_rwmutex_trywrlock(pthread_rwmutex_t *rwmutex);
+  int pthread_rwmutex_unlock(pthread_rwmutex_t *rwmutex);
+  - restrict C语言的修饰符, 被修饰的指针不能由另外一个指针进行操作
+  ```
+
+- 生产者 消费者模型 `producer customer thread/procus.c`
+对象 
+  - 生产者
+  - 消费者
+  - 容器
+
+- 一个小插曲  TODO ATTENTION
+```c
+    struct node * newnode = malloc(sizeof(struct node));
+    newnode->next = curr;
+    newnode->num = rand()%1000;
+
+    curr = newnode;
+    printlink(curr);
+
+    printf("newnode   ");
+    printlink(newnode);
+// 这链表哪里错了????
+
+ !!!!!    printlink 函数里修改了全局变量curr !!!!!
+```
+
+made 发现问题了, 原来是 if里面  `==` 写成了 `=`
+麻了 
+
+- 条件变量 `pthread_cond_t`
+  `mutex/cond.c`
+```c
+      pthread_cond_wait(&cond, &m);
+      pthread_mutex_unlock(&m);
+// 当阻塞时,会对互斥锁解锁, 当不阻塞时会重新加锁(锁本身某些特性需要cond函数这么操作把)
+```
+
+- 信号量 `sem_t` `mutex/semaphore.c`
+  ```c
+  #include <semaphore.h> 
+   int sem_init(sem_t *sem, int pshared, unsigned int value);
+  ```

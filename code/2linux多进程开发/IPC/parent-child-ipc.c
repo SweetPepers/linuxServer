@@ -50,7 +50,7 @@ int main(){
 
     // 执行之前要进行文件描述符重定向
     dup2(fd[1], STDOUT_FILENO);
-    // 执行 ps aux
+    // 执行 ps
     execlp("ps", "ps", NULL);
     
   }

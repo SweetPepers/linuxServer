@@ -6,6 +6,8 @@
     "*.wxml": "html",
     "*.wxss": "css",
     "fcntl.h": "c",
-    "stat.h": "c"
+    "stat.h": "c",
+    "time.h": "c",
+    "stdlib.h": "c"
   }
 }
