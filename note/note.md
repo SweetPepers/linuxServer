@@ -123,7 +123,7 @@ make命令默认只执行第一条规则
    2. patsubst替换![](../picture/makefile_patsubst.jpg)获取`.o`文件
 7. 伪目标 `.PHONY:clean` 之后就不会和外面对比了(工作原理2, 检查更新)
 
- 
+
 ## GDB
 功能
   - 启动程序
@@ -273,7 +273,7 @@ int fcntl(int fd, int cmd, .../*arg*/)
     - tty : 当前进程所属的终端
     - STAT状态![](../picture/2STAT参数意义.jpg)
     - command : 什么命令产生的进程
-  `ps ajx`![](../picture/2psajx.jpg)
+    `ps ajx`![](../picture/2psajx.jpg)
     - PPID: parent process ID
     - PGID: process group ID
     - SID : 会话ID(例: 多个group组成一个会话)
@@ -296,6 +296,12 @@ fork()通过 **写时拷贝(copy-on-write)** 实现.写时拷贝可以推迟甚�
 
 fork产生的子进程与父进程相同文件的文件描述符指向相同的文件表, 引用计数增加
 
+ vfork - create a child process and block parent
+
+pid_t vfork(void);
+
+
+
 ### GDB多进程调试
 `hello.c`
 
@@ -310,7 +316,7 @@ gdb默认追踪父进程
 
 ### exec函数族  `elecl.c`
 exec根据文件名找到可执行文件,并用它来取代调用进程的内容,即在调用程序内部执行一个可执行文件
- 
+
 **保留内核区, 但用户区直接被替换为调用函数**
 
 返回: **执行成功不会返回**, 失败返回-1 
@@ -374,7 +380,7 @@ pid_t waitpid(pid_t pid, int *wstatus, int options);
       <-1: 回收某个进程组的组id, 进程组id为 -pid, 
   - ret :
       >0 子进程id
-      =0 :在 option=WHNOHANG下, 表示还有子进程
+      =0 :在 option=WNOHANG下, 表示还有子进程
       =-1: 错误或者没子进程
 ```
 
@@ -398,6 +404,8 @@ pid_t waitpid(pid_t pid, int *wstatus, int options);
 ![](../picture/2_10匿名管道的使用.jpg)
 
 管道 默认**阻塞**
+
+读端是 fd[0], 写端是fd[1]
 
 一个例子 : 实现 ps aux | grep xxx  `parent-child-ipc.c`
 
@@ -507,13 +515,13 @@ length和mmap中的length一样
 5种默认处理
 
     Term   Default action is to terminate the process.
-
+    
     Ign    Default action is to ignore the signal.
-
+    
     Core   Default action is to terminate the process and dump core (see core(5)).
-
+    
     Stop   Default action is to stop the process.
-
+    
     Cont   Default action is to continue the process if it is currently stopped.
 
 
@@ -739,13 +747,270 @@ made 发现问题了, 原来是 if里面  `==` 写成了 `=`
 
 # linux 网络编程
 
-
 ## 网络基础知识
+C/S结构
+- Client:负责执行前台功能,出错提示、在线帮助,并且可以在子程序间自由切换
+- Server:
+- 优缺点
+  - 优点:
+    - 可以充分发挥客户端计算能力,所以响应速度快
+    - 漂亮,个性化要求
+    - C/S结构有较强的事务处理能力,能实现复杂的业务流程
+    - 安全性高
+  - 缺点:
+    - 客户端需要安装维护等
+    - 不能跨平台
+
+B/S结构
+- 优点:
+  - 成本低、维护方便、分不性强、开发简单,系统拓展能力强
+- 缺点
+  - 通信开销大、系统和数据的安全性难以保障
+  - 个性化低
+  - 协议一般固定 http/https
+  - 交互为 请求-响应模式,通常动态刷取界面,响应速度慢
+
+MAC地址(Media Access Control Address), 也称为局域网地址 以太网地址 物理地址  硬件地址 **唯一**
+![](../picture/4_1ipconfig.jpg)
+
+端口类型
+- 周知端口(Well Known Ports) : 0-1023,不能用
+- 注册端口(Registered Ports) : 1024 - 49151
+- 动态端口(私有端口) : 49152-65535 不固定分配某种业务,而是动态分配
+
+![](../picture/4_2TCPIP模型.jpg)
+
+协议
+- 三要素:语法 语义 时序
 
 ## socket编程
+网络中不同主机上的应用进程进行双向通信的端点的抽象
+核心: ip + port
 
+字节序
+- 大小端法
+- 字节序转换函数
+  - 网络字节顺序采用大端法
+  - ```c
+    #include <arpa/inet.h>
+    uint16_t htons(uint16_t hostshort)
+    uint16_t ntohs(uint16_t netshort)
+    uint32_t htonl(uint32_t hostlong)
+    uint32_t ntohl(uint32_t netlong)
+    ```
 
+![](../picture/4_5地址族.jpg)
+之前的结构体定义
+```c
+#include <bits/socket.h>
+struct sockaddr{
+  sa_family_t sa_family;
+  char sa_data[14];
+};
+
+typdef unsigned short int sa_family_t
+```
+新版
+```c
+#include <bits/socket.h>
+struct sockaddr_storage{
+  sa_family_t sa_family;
+  unsigned long int __ss_align
+
+  char __ss_padding[128 - sizeif(__ss_align)];
+};
+
+typdef unsigned short int sa_family_t
+```
+
+**专用socket地址**  `struct sockaddr_in` 结构
+```c
+#include <netinet.in.h>
+struct sockaddr_in
+{
+  sa_family_t sin_family;
+  in_port_t sin_port;
+  struct in_addr sin_addr;
+  unsigned char sin_zero[sizeof(struct sockaddr) 
+  -  __SOCKADDR_COMMON_SIZE - sizeof(in_port_t) 
+  - sizeof(struct in_addr)];
+};
+
+```
+
+ip地址转换
+点分十进制字符串表示的ip地址和网络字节序整数表示的Ip地址之间的转换 `socket/iptrans.c`
+```c
+#include <arpa/inet.h>
+// p 点分十进制字符串,  n网络字节序整数
+int inet_pton(int af, const char* src, void *dst);
+  - parameters
+    - af:地址族 AF_INET AF_INET6
+
+const char* inet_ntop(int af, const void *src, char *dst, socklen_t size);
+  - size : dst指向位置的大小
+  - ret : 值与dst相同
+```
 ## TCP实现
+![](../picture/4_7TCP通信流程.jpg)
+TCP通信流程
+- 服务器端
+  - 创建一个用于监听的套接字
+    - 监听:监听客户端的连接
+    - 套接字:本质是一个文件描述符
+  - 将监听的套接字和本地的IP和端口绑定
+  - 设置监听, 开始工作
+  - 阻塞等待,当有连接时解除阻塞,接收连接,得到一个用于通信的套接字(fd)
+  - 通信
+  - 断开连接
+- 客户端
+  - 创建一个用于通信的套接字(fd)
+  - 连接服务器,需要指定连接服务器的ip和端口
+  - 连接成功,通信
+  - 结束,断开连接
+
+套接字函数
+```c
+#include <sys/types.h>          /* See NOTES */
+#include <sys/socket.h> 
+// 或者直接 #include <arpa/inet.h>
+int socket(int domain, int type, int protocol);
+  - create a socket
+  - parameters
+    - domain: 协议族
+       AF_UNIX,AF_LOCAL      Local communication  
+       AF_INET      IPv4 Internet protocols  
+       AF_INET6
+    - type:通信过程中使用的协议
+      SOCK_STREAM:流
+      SCOK_DGRAM:报式
+    - protocol: 具体的协议,一般写0 
+      SOCK_STREAM : 默认tcp
+      SOCK_DGRAMG : 默认udp
+  ret:返回fd,失败返回-1
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+  绑定fd和本地的ip+port
+  - 参数
+    - sockefd
+    - addr : 需要绑定的socket地址
+    - addr指向的内存大小
+int listen(int sockfd, int backlog);
+  保存请求数量的最大值
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+  从listen的backlog中接收连接,默认阻塞
+    - addr 传出参数,记录连接成功后客户端的地址信息(ip+port)
+
+  - ret : 返回用于通信的文件描述符, 失败-1
+write  read 
+```
+
+`tcp/server.c  client.c`
+![](../picture/4TCP头部.jpg)
+![](../picture/4TCP三次握手.jpg)
+![](../picture/4TCP四次挥手.jpg)
+
+并发服务器
+accept阻塞可能会被信号处理函数(软中断)破坏, 导致accept函数出错`accept: Interrupted system call`
+```c
+    int cfd = accept(lfd, (struct sockaddr *)&clientaddr, &addrlen);
+    // accept 的阻塞被信号终止了
+
+    if(cfd == -1){
+      if(errno == EINTR0){
+        continue;
+      }
+      perror("accept");
+      return -1;
+    } 
+```
+
+tcp状态转换
+![](../picture/4TCP状态转换.jpg)
+主动断开的一方,进入TIME_WAIT状态,持续2MSL(message Segment lifetime), 让主动方发送的ACK丢失的情况下可以重新发送ack
+
+半关闭,端口复用
+- 关闭连接时, 左边发了FIN并且右边回了ACK, 但右边没有发FIN, 这时候左边就处于半关闭状态(半连接)
+- 函数
+  ```c
+  int shutdown(int sockfd, int how);
+    - how : SHUT_RD  SHUT_WR   SHUT_WDWR
+  ```
+- 多个进程共享一个文件描述符时,其中有一个进程调用了shutdown(sfd,SHUT_RDWR)后,其他的进程将无法进行通信.但是调用close(fd)不会影响其他进程 
+
+端口复用
+- 防止服务器重启之前绑定的端口还未释放
+- 程序突然退出而系统没有释放端口
+
+`netstat`命令
+- -a所有的socket
+- -p显示正在使用socketdd的程序
+- -n 直接使用IP地址,而不通过服务器名
+
+cntl+c结束 server后, server占用的端口号仍然会持续1分钟(linux) (TIME_WAIT状态)
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+// 设置套接字属性
+int setsocket(int sockfd,int level, int optname, const void*optval, socklen_t optlen);
+  - level: SOL_SOCKET
+  - optname: 
+    - SO_REUSEADDR
+    - SO_REUSEPORT
+  - optval:
+    - 1可以复用
+    - 0不可以
+  -optlen : optval的大小
+在服务器绑定端口之前设置端口复用
+```
+## IO多路复用(多路转接)
+使程序能同时监听多个文件描述符,能够提高程序的性能,linux下实现IO多路复用的API有 `select poll epoll`
+
+传统的BIO模型(blocking)
+缺点 -- 根本原因blocking
+- 线程或进程消耗资源
+- 线程或进程调度消耗资源
+
+非阻塞,忙轮询
+![](../picture/4非阻塞忙轮询.jpg)
+
+NIO模型
+每循环内O(n)系统调用,n为客户端数
+
+IO多路复用
+![](../picture/4selectpoll.jpg)
+![](../picture/4epoll.jpg)
 
 
-## epoll
+select `epoll/select.c` 
+- 构建一个文件描述符列表
+- 调用一个系统函数,监听该列表,直到这些描述符中一个或者多个进行IO时返回 
+  - 函数是阻塞
+  - 检测操作由内核完成
+- 返回时告诉进程有多少描述符要进行IO
+```c
+
+/* According to POSIX.1-2001, POSIX.1-2008 */
+#include <sys/select.h>
+
+/* According to earlier standards */
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+          fd_set *exceptfds, struct timeval *timeout);
+      - nfds:委托内核检测的最大文件描述符的值+1
+      - readfds: 委托读的属性, 是一个传入传出参数
+      - writefds : 不满置1
+      - exceptfds: 检测异常
+      - timeout: 因为函数是阻塞, 设置最大阻塞时间, 0 变送是不阻塞, null表示永久阻塞, 直到有fd变化
+
+      - ret:-1 失败, >0(n):有n个fd发生了变化
+void FD_CLR(int fd, fd_set *set);
+int  FD_ISSET(int fd, fd_set *set);  // 返回 值(用于判断)
+void FD_SET(int fd, fd_set *set);
+void FD_ZERO(fd_set *set);
+
+```
