@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <sys/select.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <sys/epoll.h>
 #include <sys/types.h>
 
 int main(){
@@ -21,61 +21,61 @@ int main(){
 
   // listen
   listen(lfd, 8);
-  int maxfd = lfd;
-  // make a fd_set
 
-  fd_set rdset, tmp;
-  FD_ZERO(&rdset);
-  FD_SET(lfd, &rdset);
+  // create an epoll instance
+  int epfd = epoll_create(1);
 
+  // add fd into epfd
+  struct epoll_event epev = {
+    .events = EPOLLIN,
+    .data.fd = lfd,
+  };
+  
+  epoll_ctl(epfd, EPOLL_CTL_ADD, lfd, &epev);
+  struct epoll_event epevs[1024];
 
   while(1){
-    tmp = rdset;
-
-    // call select 
-    int ret = select(maxfd +1, &tmp, NULL, NULL, NULL);
+    int ret = epoll_wait(epfd, epevs, 1024, -1);
     if (ret == -1){
-      perror("select ");
-      exit(0);
+      perror("epoll_wait ");
+      exit(-1);
     }else if(ret == 0){
       continue;
     }else {
+      printf("ret == %d\n", ret);
       // have fd changed
-      if(FD_ISSET(lfd, &tmp)){
-        // new client connect
+      for(int i = 0;i<ret;i++){
+        int currfd = epevs[i].data.fd;
+        if(currfd == lfd){
+        // new client arrive  
         struct sockaddr_in cliaddr;
         int len = sizeof(cliaddr);
         int cfd = accept(lfd, (struct sockaddr*)&cliaddr, &len); // 每次调用 accept都是在lfd有效的情况下, 所以accept没机会阻塞
-
-        // add cfd into rdset
-        FD_SET(cfd, &rdset);
-        maxfd = cfd > maxfd?cfd : maxfd;
-
-      }
-
-      for(int i=lfd+1;i<maxfd+1;++i){
-        if(FD_ISSET(i,&tmp)){
-          // this fd have date to read
+        printf("client in\n");
+        epev.events = EPOLLIN | EPOLLOUT;
+        epev.data.fd = cfd;
+        epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &epev);
+        }else{
+          // 有数据到达
           char buf[1024]  = {0};
-          int len = read(i, buf, sizeof(buf));
+          int len = read(currfd, buf, sizeof(buf));
           if (len == -1){
             perror("read");
             exit(-1);
           }else if(len == 0){
             printf("client closed\n");
-            close(i);
-            FD_CLR(i, &rdset);
+            epoll_ctl(epfd, EPOLL_CTL_DEL, currfd, NULL);
+            close(currfd);
+
           }else if(len > 0){
             printf("read :%s\n", buf);
-            write(i, buf, strlen(buf)+1);
+            write(currfd, buf, strlen(buf)+1);
           }
         }
       }
     }
-
   }
   close(lfd);
-
-
+  close(epfd);
   return 0;
 }

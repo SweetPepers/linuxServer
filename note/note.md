@@ -964,7 +964,7 @@ int setsocket(int sockfd,int level, int optname, const void*optval, socklen_t op
   -optlen : optval的大小
 在服务器绑定端口之前设置端口复用
 ```
-## IO多路复用(多路转接)
+## IO多路复用(多路转接)  epoll
 使程序能同时监听多个文件描述符,能够提高程序的性能,linux下实现IO多路复用的API有 `select poll epoll`
 
 传统的BIO模型(blocking)
@@ -1014,3 +1014,72 @@ void FD_SET(int fd, fd_set *set);
 void FD_ZERO(fd_set *set);
 
 ```
+
+缺点
+![](../picture/4select缺点.jpg)
+
+poll -- select的改进版 `epoll/poll.c`
+```c
+#include <poll.h>
+struct pollfd {
+   int   fd;         /* file descriptor */
+   short events;     /* requested events */
+   short revents;    /* returned events */
+};
+int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+  - fds 也是数组, struct pollfd的集合
+  - nfds 最大下标+1, 一般为个数
+  - timeout 0 不阻塞, -1阻塞, 有变化时解除  >0 阻塞时间
+```
+
+epoll
+```c
+#include <sys/epoll.h>
+// 在内核中创建实例 struct eventpoll, 两个核心的结构 
+//   - struct rb_root rbr; : 需要检测的文件描述符(rbtree)
+//   - struct list_head rdlist; : 就绪列表(双向链表)
+int epoll_create(int size);
+  - size没意义了 , 随便写个就行 >0  
+  - retval : -1 for failed, >0 : epfd : 操作创建实例的文件描述符
+
+typedef union epoll_data {
+  void    *ptr;
+  int      fd;
+  uint32_t u32;
+  uint64_t u64;
+} epoll_data_t;
+
+struct epoll_event {
+  uint32_t     events;    /* Epoll events */
+  epoll_data_t data;      /* User data variable */
+};
+常用的 event 
+  - EPOLLIN 
+  - EPOLLOUT // TODO 这个是干嘛的   老是出错误 
+  - EPOLLERR  
+  - EPOLLET 边沿触发
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+  - op
+    - EPOLL_CTL_ADD
+    - EPOLL_CTL_MOD
+    - EPOLL_CTL_DEL
+  - event 具体操作
+int epoll_wait(int epfd, struct epoll_event*events,int maxevents, int timeout);
+  检测函数
+  - events 传出函数,保存发送了变化的文件描述符信息
+  - maxevents 第二个参数的大小
+  - timeout 0 不阻塞  -1 阻塞 >0 具体时间(毫秒)
+
+  retval : >0 发生变化的个数   -1 for failed
+```
+
+
+epoll的两种工作模式
+- LT模式(level-triggered)(水平触发) `epoll_lt.c`
+  - 缺省的工作方式(默认), 同时支持block和no-block socket. 在这种做法中, 内核告诉你一个文件描述符是否就绪, 然后你可以对这个就绪的fd进行IO操作. 如果不做任何操作, 内核还会通知你
+- ET(edge-triggered)(边沿触发)  `epoll_et.c`
+  - 高速工作方式, 只支持no-block socket. 这种模式下, 当描述符从未就绪变为就绪时, 内核通过epoll通知你. 然后内核会假设你知道文件描述符已就绪,并且不会再为那个文件描述符发送更多的就绪通知,直到你做了某些操作导致那个文件描述符重新变为未就绪. **注意, 如果一直不对这个fd做IO操作(从而导致它再次标变为未就绪), 内核不会发送更多的通知(only once)**
+  - ET模式在很大程度上减少了epoll事件被重复触发的次数, 因此效率要比LT模式高. epoll工作在ET模式的时候, 必须使用非阻塞套接口, 以避免一个文件句柄的阻塞读/阻塞写把处理多个文件描述符的任务饿死
+
+
+// TODO et 有点bug  明天再改   脑袋疼
