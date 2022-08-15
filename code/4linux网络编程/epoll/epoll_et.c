@@ -67,11 +67,10 @@ int main(){
           char buf[5]  = {0};
           int len = 0;
           // 循环读出所有数据
-          while(len = read(currfd, buf, sizeof(buf)) > 0){
-            printf("recv : %s\n", buf);
+          while((len = read(currfd, buf, sizeof(buf))) > 0){  // 优先级问题
+            printf("recv : %s, len %d\n", buf, len);
             write(currfd, buf, len);
           }
-
           if (len == -1){
             perror("read");
             exit(-1);

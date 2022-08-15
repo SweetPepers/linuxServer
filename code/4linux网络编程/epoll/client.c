@@ -33,8 +33,6 @@ int main(){
     
     write(fd, str, strlen(str)+1);
 
-    sleep(1);
-
     // 获取server数据
     char recvbuf[1024];
     int len = read(fd, recvbuf, sizeof(recvbuf));
@@ -43,7 +41,7 @@ int main(){
       return -1;
     }
     if(len > 0){
-      printf("recv server data : %s\n", recvbuf);
+      printf("recv server data : %s, len %d\n", recvbuf, len);
     }else if(len == 0){
       // 客户端断开连接
       printf("server closed\n");

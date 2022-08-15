@@ -882,8 +882,8 @@ int socket(int domain, int type, int protocol);
        AF_INET      IPv4 Internet protocols  
        AF_INET6
     - type:通信过程中使用的协议
-      SOCK_STREAM:流
-      SCOK_DGRAM:报式
+      SOCK_STREAM:流 tcp
+      SCOK_DGRAM:报式 udp
     - protocol: 具体的协议,一般写0 
       SOCK_STREAM : 默认tcp
       SOCK_DGRAMG : 默认udp
@@ -901,7 +901,10 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
     - addr 传出参数,记录连接成功后客户端的地址信息(ip+port)
 
   - ret : 返回用于通信的文件描述符, 失败-1
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+
 write  read 
+send recv
 ```
 
 `tcp/server.c  client.c`
@@ -1082,4 +1085,89 @@ epoll的两种工作模式
   - ET模式在很大程度上减少了epoll事件被重复触发的次数, 因此效率要比LT模式高. epoll工作在ET模式的时候, 必须使用非阻塞套接口, 以避免一个文件句柄的阻塞读/阻塞写把处理多个文件描述符的任务饿死
 
 
-// TODO et 有点bug  明天再改   脑袋疼
+// TODO et 有点bug  明天再改   脑袋疼  
+
+// TODO 2视频里面的代码并没有设置文件名描述符非阻塞, 有两个问题
+  - 设置非阻塞, 怎么让while停止??   明显 len > 0 是不对的
+  - 不设置非阻塞, 只能与一个client通信了
+
+UDP `tcp/udp.c`
+![](../picture/4_10UDP.jpg)
+
+- API
+  ```c
+   #include <sys/types.h>
+   #include <sys/socket.h>
+
+   ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,const struct sockaddr *dest_addr, socklen_t addrlen);
+    - flags : 0 一般不用
+   ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+
+  ```
+
+广播 `udp/broadcast*.c`
+- 只能在局域网中使用
+- 客户端需要绑定服务器广播使用的端口,才可以接收到广播消息
+
+```c
+#include <sys/types.h>          /* See NOTES */
+#include <sys/socket.h>
+
+int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
+int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+  - level : SOL_SOCKET
+  - optname: SOL_BOARDCAST
+  - optval : 1 允许广播
+  - optval的 大小
+```
+
+
+多播 `udp/`
+- 多播既可以局域网, 也可以广域网使用
+- 客户端需要加入多播组,才能接收信息 
+
+```c
+  多播还是 setsockopt函数
+  服务端
+  - level : IPPROTO_IP
+  - opname : IP_MULTICAST_IF
+  - optval: struct in_addr
+  
+  客户端
+  - level :IPPROTO_IP
+  - opname : IP_ADD_MEMBERSHIP
+  - optval: struct ip_mreq
+```
+
+本地套接字通信 : 本地的进程间通信 `tcp/ipc_server.c ipc_client.c`
+
+流程 和网络套接字类似 (TCP)  
+- server
+  - 创建listen的套接字 : `int lfd = socket(AF_UNIX,SOCK_STREAM, 0)`
+  - bind 
+    - struct sockaddr_un addr;
+    - bind(lfd, addr, len)  绑定后, 指定的sun_path中的套接字文件会自动生成
+  - listen
+  - wait and accept
+    - struct sockaddr_un cliaddr;
+    - int cfd = accept(lfd, &cliaddr, len);
+  - 通信
+    - read/recv
+    - write/send
+  - 关闭
+- client
+  - int fd = socket(AF_UNIX,SOCK_STREAM, 0)
+  - bind
+  - connect
+  - 通信
+  - close
+
+```c
+#include <sys/un.h>
+struct sockaddr_un {
+  sa_family_t sun_family // af_local
+  char sun_path[UNIX_PATH_MAX]  // 伪文件,size永远是0
+}
+```
+
+# 实战与总结
