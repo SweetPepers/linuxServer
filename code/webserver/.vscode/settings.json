@@ -1,0 +1,10 @@
+{
+  "C_Cpp.errorSquiggles": "Disabled",
+  "files.associations": {
+    "*.vue": "vue",
+    "*.wpy": "vue",
+    "*.wxml": "html",
+    "*.wxss": "css",
+    "*.tcc": "cpp"
+  }
+}

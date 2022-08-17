@@ -1,7 +1,7 @@
 [TOC]
 
 
-函数指针  =&myfunc  还是 =myfunc
+函数指针是 =myfunc
 
 # 了解linux
 运行进程的时候加个 `&` 表示在后台运行 (后台进程)
@@ -10,7 +10,7 @@
 
 - `gcc test_gcc.c -E -o test.i` 预处理
 - ` gcc test.i -S -o test.s` 编译为汇编代码
-- `gcc test.s -s -o test.o` 
+- `gcc test.s -c -o test.o` 
 
 ![](../picture/2gcc工作流程.jpg)
 
@@ -1098,11 +1098,11 @@ UDP `tcp/udp.c`
   ```c
    #include <sys/types.h>
    #include <sys/socket.h>
-
+  
    ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,const struct sockaddr *dest_addr, socklen_t addrlen);
     - flags : 0 一般不用
    ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
-
+  
   ```
 
 广播 `udp/broadcast*.c`
@@ -1171,3 +1171,70 @@ struct sockaddr_un {
 ```
 
 # 实战与总结
+## 阻塞非阻塞, 同步异步
+- 网络IO阶段1 数据就绪(操作系统  TCP接收缓冲区)
+  - 阻塞 : 调用IO方法的线程进入阻塞状态, recv
+  - 非阻塞 : 不改变线程状态, 通过返回值判断 (注: size==-1(EINTR EAGAIN or EWOULDBLOCK)(while len > 0 总会有<=0的 所以判断EAGAIN表示当前读完))
+
+- 网络IO阶段2 数据读写(应用程序)
+  - 同步 : 进程自己 recv
+  - 异步 : 告诉os 异步IO接口 sockfd buf 通知方式(signal)   aio_read  aio_write
+
+![](../picture/5_1同步异步阻塞.jpg)
+在处理IO时, 阻塞和非阻塞都是同步, 之后使用了特殊API才是异步IO
+
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+```
+
+## Unix linux上五种IO模型
+![](../picture/5_2ablocking.jpg)
+![](../picture/5_2b.jpg)
+![](../picture/5_2c.jpg)
+![](../picture/5_2d.jpg)
+![](../picture/5_2e.jpg)
+
+
+
+## web服务器简介及http协议
+web server 处理 client 的 http请求
+通过TCP三次握手建立连接, http协议生成针对目标webserver的http请求报文,再通过tcp ip等协议发送
+
+http : 请求 -- 响应
+
+## 服务器编程基本框架和两种高效的事件处理模式
+通常需处理三种事件: I/O事件, 信号, 定时事件
+- Reactor : 同步IO
+  ![](../picture/5_4Reactor.jpg)
+- Proactor : 异步IO
+  ![](../picture/5_4Proactor.jpg)
+
+模拟Proactor
+![](../picture/5_4模拟proactor.jpg)
+![](../picture/5_4模拟proactor流程.jpg)
+## 线程同步机制类封装及线程池实现
+### 线程池 
+: 由服务器创建的一组子进程, 线程池中的线程数量应该和CPU数量差不多. 线程池里的所有子线程都运行着相同的代码. 当有新任务到来时,主线程通过某种方式选择线程池中的一个子线程为其服务. 相比动态的创建子进程, **选择一个已经存在的子进程代价要小很多**
+如何选
+- 选个调度算法,典型如Round Robin
+- 主线程和所有子线程通过一个共享的工作队列来同步, 子线程都睡眠在该工作队列上. 当有新的任务到来时,主线程将任务添加到工作队列中. 这将唤醒等待任务的子进程,不过只有一个子进程将获得新任务的"接管权",将任务从队列中取出
+
+线程池中数量: 
+- CPU密集型,设置为CPU核数
+- IO密集型, 设置多于CPU核数, 否则CPU将空置浪费
+
+空间换时间, 静态资源
+
+
+### 
+## 写代码 
+
+![](../picture/5_6epolloneshot.jpg)
+
+静态变量需要初始化
+int http_conn::m_epollfd = -1;
+int http_conn::m_user_count = 0;

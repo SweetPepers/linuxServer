@@ -11,13 +11,13 @@
 int main(){
   // create a socket
   int lfd = socket(PF_INET, SOCK_STREAM, 0);
+
+
+  // bind
   struct sockaddr_in saddr;
   saddr.sin_port = htons(9999);
   saddr.sin_family = AF_INET;
   saddr.sin_addr.s_addr = INADDR_ANY;
-
-
-  // bind
   bind(lfd, (struct sockaddr*)&saddr, sizeof(saddr));
 
   // listen
