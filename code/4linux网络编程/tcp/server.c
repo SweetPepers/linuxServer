@@ -13,7 +13,7 @@ int main(){
     return -1;
   }
 
-  // 2. 绑定
+  // 2. 绑定自己的ip+port到lfd
   struct sockaddr_in saddr;
   saddr.sin_family = AF_INET;
   inet_pton(AF_INET, "127.0.0.1", &saddr.sin_addr.s_addr);

@@ -23,7 +23,7 @@ void addsig(int sig, void(handler)(int)){
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_handler = handler;
-  sigfillset(&sa.sa_mask);
+  sigfillset(&sa.sa_mask);  // 所有标志位置1, 阻塞所有信号
   sigaction(sig, &sa, NULL);
 }
 
@@ -102,7 +102,7 @@ int main(int argc, char * argv[]){
     // 循环遍历事件数组
     for(int i = 0;i<num;i++){
       int sockfd = events[i].data.fd;
-      if(sockfd == listenfd){
+      if(sockfd == listenfd){  // 连接请求
         // client connected 
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
@@ -114,7 +114,6 @@ int main(int argc, char * argv[]){
           close(connfd);
           continue;
         }
-
         //  将客户放到 users数组中
         users[connfd].init(connfd, client_addr);
       }else if(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){

@@ -1,8 +1,8 @@
 /*
 
-// 设置 阻塞集
+设置 阻塞集
 int sigemptyset(sigset_t *set);
-  - 所有标志位置0
+  - 所有标志位置0 不阻塞任何信号
   - retval: 成功0, 失败-1
 int sigfillset(sigset_t *set);
   - 所有标志位置1
@@ -10,7 +10,7 @@ int sigfillset(sigset_t *set);
 int sigaddset(sigset_t *set, int signum);
   - 设置指定为1
 int sigdelset(sigset_t *set, int signum);
-  - 设置指定为1
+  - 设置指定为0
 int sigismember(const sigset_t *set, int signum);
   - 判断signum在set中是否阻塞
   - 1 阻塞
@@ -66,7 +66,7 @@ int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
   - 将自定义信号集的数据设置到内核中
   - parameters
     - how : 
-      - SIG_BLOCK : 类似添加, 做 mask |= set 操作 原来的 110 and 001 = 111
+      - SIG_BLOCK : 类似添加, 做 mask |= set 操作 原来的 110 or 001 = 111
       - SIG_UNBLOCK : 解除阻塞 mask & ~set
       - SIG_SETMASK : 覆盖
     - set

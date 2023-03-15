@@ -259,7 +259,9 @@ int fcntl(int fd, int cmd, .../*arg*/)
 ![](../picture/2单道多道程序.jpg)
 
 ![](../picture/2PCB.jpg)
+
 ![](../picture/2PCb2.jpg)
+
 - 进程可以使用的资源上限(可用`ulimit -a`查看)
 
 
@@ -382,6 +384,9 @@ pid_t waitpid(pid_t pid, int *wstatus, int options);
       >0 子进程id
       =0 :在 option=WNOHANG下, 表示还有子进程
       =-1: 错误或者没子进程
+  - options:
+			WNOHANG	如果pid指定的子进程没有结束，则waitpid()函数立即返回0，而不是阻塞在这个函数上等待；如果结束了，则返回该子进程的进程号。	
+			WUNTRACED	如果子进程进入暂停状态，则马上返回。
 ```
 
 
@@ -648,6 +653,7 @@ signal/sigfunc.c
 ```c
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
 void pthread_exit(void *retval);
+//pthread_exit() 函数只会终止当前线程，不会影响进程中其它线程的执行。
 
 int pthread_join(pthread_t thread, void **retval);
 ```
@@ -706,8 +712,9 @@ child 0
   - restrict C语言的修饰符, 被修饰的指针不能由另外一个指针进行操作
   ```
 
-- 生产者 消费者模型 `producer customer thread/procus.c`
-对象 
+- 生产者 消费者模型 `producer customer thread/procust.c`
+  对象 
+
   - 生产者
   - 消费者
   - 容器
@@ -817,7 +824,7 @@ struct sockaddr_storage{
   sa_family_t sa_family;
   unsigned long int __ss_align
 
-  char __ss_padding[128 - sizeif(__ss_align)];
+  char __ss_padding[128 - sizeof(__ss_align)];
 };
 
 typdef unsigned short int sa_family_t
@@ -1238,3 +1245,30 @@ http : 请求 -- 响应
 静态变量需要初始化
 int http_conn::m_epollfd = -1;
 int http_conn::m_user_count = 0;
+
+
+解析http请求 -- 有限状态机
+```
+GET / HTTP/1.1
+Host: 172.28.122.8:1000
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+```
+处理http请求的结果
+- NO_REQUEST : 请求不完整,需要继续读取客户数据
+- GET_REQUEST : 成功
+- BAD_REQUEST : 请求语法错误
+- NO_RESOURSE :
+- FORBIDDEN_REQUEST : 客户对资源没有访问权限
+- FILE_REQUEST : 文件请求, 获取文件成功
+- INTERNAL_ERROR  : 内部错误 
+- CLOSE_CONNECTION : 客户端断开连接 
+
+``` c
+char *strpbrk (const char *__s, const char *__accept)
+// 返回accept中字符最先出现的位置
+```

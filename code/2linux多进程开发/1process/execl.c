@@ -48,10 +48,10 @@ int execlpdemo(){
   // execldemo();
   // 创建一个子进程, 在子进程中 执行exec族中的函数
   pid_t pid = fork();
-  if(pid > 0){
+  if(pid > 0){   // parent
     printf("\n\nEXEC im parent process, pid : %d\n", getpid());
     sleep(1);
-  }else{
+  }else{ // child
     printf("\n\nEXEC im child process, pid : %d, ppid: %d\n", getpid(), getppid());
 
     // 第一个参数并不影响结果啊
